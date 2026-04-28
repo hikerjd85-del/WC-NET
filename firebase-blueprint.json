@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "Tournament": {
+      "title": "Tournament",
+      "description": "User's tournament properties",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "groupScores": { "type": "object" },
+        "koScores": { "type": "object" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "groupScores", "koScores", "updatedAt", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/tournaments/{userId}": {
+      "schema": "Tournament",
+      "description": "A user's tournament data"
+    }
+  }
+}

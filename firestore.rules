@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTournament(data) {
+      return data.keys().hasAll(['userId', 'displayName', 'groupScores', 'koScores', 'updatedAt', 'createdAt'])
+        && data.keys().size() == 6
+        && data.userId is string && data.userId.size() <= 128
+        && data.userId == request.auth.uid
+        && data.displayName is string && data.displayName.size() <= 128
+        && data.groupScores is map
+        && data.koScores is map
+        && data.updatedAt is timestamp
+        && data.createdAt is timestamp;
+    }
+
+    function isUpdateTournament(data) {
+       return data.userId is string && data.userId.size() <= 128
+        && data.userId == request.auth.uid
+        && data.displayName is string && data.displayName.size() <= 128
+        && data.groupScores is map
+        && data.koScores is map
+        && data.updatedAt is timestamp
+        && data.createdAt is timestamp;
+    }
+
+    match /tournaments/{userId} {
+      // Must only be able to read/list their own tournament
+      allow get: if isSignedIn() && isValidId(userId) && userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn() 
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isValidTournament(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isUpdateTournament(incoming())
+        && incoming().userId == existing().userId // Immutable
+        && incoming().createdAt == existing().createdAt // Immutable
+        && incoming().updatedAt == request.time
+        && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['groupScores', 'koScores', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'groupScores', 'koScores', 'updatedAt'])
+        );
+        
+      allow delete: if isSignedIn() && isValidId(userId) && userId == request.auth.uid;
+    }
+  }
+}
